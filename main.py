@@ -16,12 +16,33 @@ if __name__ == '__main__':
         # ensure values are of the right type
         return # decoded chromosome
 
-    # fitness function
-    def fitness(inst, c_penalty):
+    # evaluate the fitness of 'chromosome'
+    def fitness(chromosome, c_penalty):
         # generate track points
+        track_points = generate_track(chromosome_elements=chromosome)
         # calculate distance between start and end points
+        start_point = track_points[0]
+        end_point = track_points[len(chromosome_elements)-1]
+        distance = math.sqrt((start_point.x - end_point.x)**2 + (start_point.y - end_point.y)**2)
         # calculate number of segment intersections
-        return # distance + c_penalty * intersections
+        n_int = 0
+        for i in range(len(track_points) - 3):
+            for j in range(i + 2, len(track_points) - 1):
+                # set up points
+                p1, p2 = track_points[i], track_points[i+1]
+                p3, p4 = track_points[j], track_points[j+1]
+                x1, x2, x3, x4 = p1.x, p2.x, p3.x, p4.x
+                y1, y2, y3, y4 = p1.y, p2.y, p3.y, p4.y
+                # check if segments intersect
+                denom = (x1-x2) * (y3-y4) - (y1-y2) * (x3-x4);
+                if denom != 0:
+                    t = ((x1-x3) * (y3-y4) - (y1-y3) * (x3-x4)) / denom
+                    if 0 < t <= 1:
+                        u = (((x2-x1) * (y1-y3)) - ((y2-y1) * (x1-x3))) / denom
+                        if 0 < u <= 1:
+                            # increment 'n_int'
+                            n_int += 1
+        return distance + c_penalty * n_int
 
     # select a parent with tournament selection
     def selection(pop, scores, k=3):
