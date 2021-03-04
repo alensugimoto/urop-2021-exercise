@@ -23,10 +23,16 @@ if __name__ == '__main__':
         # calculate number of segment intersections
         return # distance + c_penalty * intersections
 
-    # tournament selection
+    # select a parent with tournament selection
     def selection(pop, scores, k=3):
-        # pick and compare k chromosomes
-        return # best chromosome
+    	# select a random index
+    	selection_i = randint(len(pop))
+    	for i in randint(0, len(pop), k-1):
+    		# check if this index is better than 'selection_i'
+    		if scores[i] < scores[selection_i]:
+                # update best index
+    			selection_i = i
+    	return pop[selection_i]
 
     # perform a singe-point crossover
     def crossover(p1, p2, r_cross):
