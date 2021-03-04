@@ -1,6 +1,7 @@
 from ga.chromosome_elem import ChromosomeElem
 from track_generator.command import Command
 from track_generator.generator import generate_track
+from numpy.random import rand
 
 import matplotlib.pyplot as plt
 import config
@@ -32,10 +33,13 @@ if __name__ == '__main__':
         # perform crossover based on crossover rate
         return # children
 
-    # mutation operator
+    # mutate 'bitstring' at a rate 'r_mut'
     def mutation(bitstring, r_mut):
-        # for each bit, perform a bit flip based on mutation rate
-        return # nothing
+        for i in range(len(bitstring)):
+    		# try to mutate bit
+            if rand() < r_mut:
+                # flip bit
+                bitstring[i] = 1 - bitstring[i]
 
     # genetic algorithm
     def genetic_algorithm(fitness, bounds, n_inst, n_bits, n_iter, n_pop, c_penalty, r_cross, r_mut):
