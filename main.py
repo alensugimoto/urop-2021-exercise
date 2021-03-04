@@ -1,6 +1,7 @@
 from ga.chromosome_elem import ChromosomeElem
 from track_generator.command import Command
 from track_generator.generator import generate_track
+from numpy.random import randint
 from numpy.random import rand
 
 import matplotlib.pyplot as plt
@@ -27,11 +28,18 @@ if __name__ == '__main__':
         # pick and compare k chromosomes
         return # best chromosome
 
-    # two-parent crossover
+    # perform a singe-point crossover
     def crossover(p1, p2, r_cross):
-        # copy parents into children
-        # perform crossover based on crossover rate
-        return # children
+    	# copy parents into children
+    	c1, c2 = p1.copy(), p2.copy()
+    	# try to perform a crossover
+    	if rand() < r_cross:
+    		# select crossover point
+    		pt = randint(1, len(p1))
+    		# perform crossover
+    		c1 = p1[:pt] + p2[pt:]
+    		c2 = p2[:pt] + p1[pt:]
+    	return [c1, c2]
 
     # mutate 'bitstring' at a rate 'r_mut'
     def mutation(bitstring, r_mut):
