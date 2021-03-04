@@ -11,10 +11,54 @@ import math
 if __name__ == '__main__':
 
     # decode a bitstring to a chromosome
-    def decode(bitstring, bounds, n_inst, n_bits):
-        # for every n_bits in bitstring, decode an instruction
-        # ensure values are of the right type
-        return # decoded chromosome
+    def decode(bounds, n_inst, n_bits, bitstring):
+        decoded = list()
+        prev_command = None
+        largest_value = 2**(n_bits - 2)
+        for i in range(n_inst):
+            command = None
+            start = i * n_bits
+            end = start + n_bits
+
+            # decode command of instruction
+            if i == 0 or i == n_inst - 1:
+                command = Command.S
+            elif prev_command == Command.S:
+                # extract the substring
+                command_substring = bitstring[start:start + 2]
+                # convert bitstring to a string of chars
+                command_chars = ''.join([str(s) for s in command_substring])
+                # convert string to integer
+                command = int(command_chars, 2)
+            else:
+                # extract the substring
+                command_substring = bitstring[start + 1:start + 2]
+                # convert bitstring to a string of chars
+                command_chars = ''.join([str(s) for s in command_substring])
+                # convert string to a command
+                if prev_command == Command.DY:
+                    command = [Command.L, Command.R][int(command_chars, 2)]
+                else:
+                    command = [Command.S, Command.DY][int(command_chars, 2)]
+
+            # decode value of instruction
+            # extract the substring
+            value_substring = bitstring[start + 3:end]
+            # convert bitstring to a string of chars
+            value_chars = ''.join([str(s) for s in value_substring])
+            # convert string to integer
+            integer = int(value_chars, 2)
+            # scale integer to desired range
+            value = bounds[command][0] + (integer / largest_value) * \
+                (bounds[command][1] - bounds[command][0])
+            # round value for certain commands
+            if command != Command.DY:
+                value = round(value)
+
+            # store
+            prev_command = command
+            decoded.append(ChromosomeElem(command=command, value=value))
+        return decoded
 
     # evaluate the fitness of 'chromosome'
     def fitness(chromosome, c_penalty):
