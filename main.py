@@ -29,7 +29,7 @@ if __name__ == '__main__':
                 # convert bitstring to a string of chars
                 command_chars = ''.join([str(s) for s in command_substring])
                 # convert string to integer
-                command = int(command_chars, 2)
+                command = [Command.S, Command.L, Command.R, Command.DY][int(command_chars, 2)]
             else:
                 # extract the substring
                 command_substring = bitstring[start + 1:start + 2]
@@ -49,8 +49,8 @@ if __name__ == '__main__':
             # convert string to integer
             integer = int(value_chars, 2)
             # scale integer to desired range
-            value = bounds[command][0] + (integer / largest_value) * \
-                (bounds[command][1] - bounds[command][0])
+            value = bounds[command.value][0] + (integer / largest_value) * \
+                (bounds[command.value][1] - bounds[command.value][0])
             # round value for certain commands
             if command != Command.DY:
                 value = round(value)
@@ -66,7 +66,7 @@ if __name__ == '__main__':
         track_points = generate_track(chromosome_elements=chromosome)
         # calculate distance between start and end points
         start_point = track_points[0]
-        end_point = track_points[len(chromosome_elements)-1]
+        end_point = track_points[len(track_points)-1]
         distance = math.sqrt((start_point.x - end_point.x)**2 + (start_point.y - end_point.y)**2)
         # calculate number of segment intersections
         n_int = 0
@@ -155,10 +155,19 @@ if __name__ == '__main__':
             pop = children
         return [best, best_eval]
 
-    chromosome_elements = [ChromosomeElem(command=Command.S, value=11),
-                           ChromosomeElem(command=Command.DY, value=15.5),
-                           ChromosomeElem(command=Command.R, value=9),
-                           ChromosomeElem(command=Command.S, value=10)]
+    CHROMOSOME_LENGTH = 19
+    NUM_ELEMENT_BITS = 16
+    NUM_GENERATIONS = 100
+    POPULATION_SIZE = 100
+    CROSSOVER_RATE = 0.9
+    MUTATION_RATE = 1.0/float(CHROMOSOME_LENGTH * NUM_ELEMENT_BITS)
+    PENALTY_COEF = 50.0
+    INST_VALUE_BOUNDS = [[5.0, 10.0], [5.0, 10.0], [5.0, 10.0], [0.0, 45.0]]
+    # perform the genetic algorithm search
+    best, score = genetic_algorithm(fitness, INST_VALUE_BOUNDS, CHROMOSOME_LENGTH, NUM_ELEMENT_BITS, NUM_GENERATIONS, POPULATION_SIZE, PENALTY_COEF, CROSSOVER_RATE, MUTATION_RATE)
+    print('Done!')
+    chromosome_elements = decode(INST_VALUE_BOUNDS, CHROMOSOME_LENGTH, NUM_ELEMENT_BITS, best)
+    print('f(%s) = %f' % ([str(d) for d in chromosome_elements], score))
 
     track_points = generate_track(chromosome_elements=chromosome_elements)
 
