@@ -122,13 +122,38 @@ if __name__ == '__main__':
 
     # genetic algorithm
     def genetic_algorithm(fitness, bounds, n_inst, n_bits, n_iter, n_pop, c_penalty, r_cross, r_mut):
-        # generate random bitstring
-        # for every generation:
-        #   decode population
-        #   get fitness values
-        #   select parents
-        #   create new population
-        return # best solution
+        # initial population of random bitstrings
+        pop = [randint(0, 2, n_bits * n_inst).tolist() for _ in range(n_pop)]
+        # keep track of best solution
+        best, best_eval = pop[0], fitness(decode(bounds, n_inst, n_bits, pop[0]), c_penalty)
+        # enumerate generations
+        for gen in range(n_iter):
+            # decode population
+            decoded = [decode(bounds, n_inst, n_bits, p) for p in pop]
+            # evaluate all chromosomes in the population
+            scores = [fitness(d, c_penalty) for d in decoded]
+            # check for new best solution
+            for i in range(n_pop):
+                if scores[i] < best_eval:
+                    best, best_eval = pop[i], scores[i]
+                    print(">%d, new best f(%s) = %f" %
+                          (gen, [str(d) for d in decoded[i]], scores[i]))
+            # select parents
+            selected = [selection(pop, scores) for _ in range(n_pop)]
+            # create the next generation
+            children = list()
+            for i in range(0, n_pop, 2):
+                # get selected parents in pairs
+                p1, p2 = selected[i], selected[i + 1]
+                # crossover and mutation
+                for c in crossover(p1, p2, r_cross):
+                    # mutation
+                    mutation(c, r_mut)
+                    # store for next generation
+                    children.append(c)
+            # replace population
+            pop = children
+        return [best, best_eval]
 
     chromosome_elements = [ChromosomeElem(command=Command.S, value=11),
                            ChromosomeElem(command=Command.DY, value=15.5),
