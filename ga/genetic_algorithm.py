@@ -40,7 +40,7 @@ def genetic_algorithm(
         ) for bitstring in pop]
         # evaluate all chromosomes in the population
         scores: float = [fitness(
-            chromosome=chromosome,
+            chromosome_elements=chromosome,
             penalty_coefs=penalty_coefs,
         ) for chromosome in decoded_pop]
         # check for new best solution
@@ -50,7 +50,7 @@ def genetic_algorithm(
                 print(">%(gen)d, new best f([%(chromosome)s]) = %(score)f" % {
                     "gen": gen,
                     "chromosome": ', '.join([str(elem) for elem in best_chromosome]),
-                    "score": scores[i]
+                    "score": scores[i],
                 })
         # select parents
         selected: List[Bitstring] = [selection(
@@ -71,6 +71,11 @@ def genetic_algorithm(
                 children.append(child)
         # replace population
         pop = children
+    print('Done!')
+    print("f([%(chromosome)s]) = %(score)f" % {
+        "chromosome": ', '.join([str(elem) for elem in best_chromosome]),
+        "score": best_score,
+    })
     return best_chromosome
 
 
@@ -80,34 +85,30 @@ def decode(
     chromosome_length: int,
     value_bounds: Tuple[Pair, Pair, Pair, Pair],
 ) -> List[ChromosomeElem]:
+    decoded: List[ChromosomeElem] = []
     prev_command: Command
 
-    decoded = list()
     num_command_bits = 2
     num_value_bits = num_bits_per_inst - num_command_bits
     largest_value = 2**num_value_bits
     # decode each instruction
     for i in range(chromosome_length):
-        command: Command
-
-        start_inst = i * num_bits_per_inst
-        end_inst = start_inst + num_bits_per_inst
-
+        start = i * num_bits_per_inst
+        end = start + num_bits_per_inst
         # decode command of instruction
+        command: Command
         if i == 0 or i == chromosome_length - 1:
             command = Command.S
         elif prev_command == Command.S:
             # extract the substring
-            command_substring = bitstring[start_inst:start_inst +
-                                          num_command_bits]
+            command_substring = bitstring[start:start + num_command_bits]
             # convert bitstring to a string of chars
             command_chars = ''.join([str(s) for s in command_substring])
             # convert string to integer
             command = Command(int(command_chars, 2))
         else:
             # extract the substring
-            command_substring = bitstring[start_inst +
-                                          1:start_inst + num_command_bits]
+            command_substring = bitstring[start + 1:start + num_command_bits]
             # convert bitstring to a string of chars
             command_chars = ''.join([str(s) for s in command_substring])
             # convert string to a command
@@ -115,19 +116,17 @@ def decode(
                 command = Command(int(command_chars, 2) + 1)
             else:
                 command = Command(int(command_chars, 2) * 3)
-
         # decode value of instruction
+        value: float
         # extract the substring
-        value_substring = bitstring[start_inst +
-                                    num_command_bits + 1:start_inst]
+        value_substring = bitstring[start + num_command_bits + 1:end]
         # convert bitstring to a string of chars
         value_chars = ''.join([str(s) for s in value_substring])
         # convert string to integer
         integer = int(value_chars, 2)
         # scale integer to desired range
-        value = bounds[command.value][0] + (integer / largest_value) * \
-            (bounds[command.value][1] - bounds[command.value][0])
-
+        value = value_bounds[command.value][0] + (integer / largest_value) * \
+            (value_bounds[command.value][1] - value_bounds[command.value][0])
         # store
         prev_command = command
         decoded.append(ChromosomeElem(command=command, value=value))
@@ -146,6 +145,7 @@ def fitness(
     end_point = track_points[len(track_points) - 1]
     disp = math.sqrt((start_point.x - end_point.x)**2
                      + (start_point.y - end_point.y)**2)
+
     # calculate number of segment intersections
     num_intersects = 0
     for i in range(len(track_points) - 3):
@@ -164,17 +164,21 @@ def fitness(
                     if 0 < u <= 1:
                         # increment 'n_int'
                         num_intersects += 1
-    # calculate degree of kink at start and end points
-    pt_before_end = track_points[len(track_points) - 2]
-    penalty2 = abs(pt_before_end.x - end_point)
-    # return fitness
-    return disp + penalty_coefs[0] * num_intersects + penalty_coefs[1] * penalty2
+
+    # direction of a car at the end point against the horizontal
+    angle = math.atan2(
+        end_point.y - track_points[len(track_points) - 2].y,
+        end_point.x - track_points[len(track_points) - 2].x
+    )
+    diff = abs(math.pi / 2 - angle)
+
+    return disp + penalty_coefs[0] * num_intersects + penalty_coefs[1] * diff
 
 
 def selection(
-    population: List[Bitstring]
-    scores: List[float]
-    k: int = 3
+    population: List[Bitstring],
+    scores: List[float],
+    k: int = 3,
 ) -> Bitstring:
     # select a random index
     selection_i = randint(len(population))
@@ -189,6 +193,8 @@ def selection(
 def crossover(
     parent1: Bitstring,
     parent2: Bitstring,
+    num_bits_per_inst: int,
+    chromosome_length: int,
     crossover_rate: float,
 ) -> Tuple[Bitstring, Bitstring]:
     # copy parents into children
@@ -196,7 +202,7 @@ def crossover(
     # try to perform a crossover
     if rand() < crossover_rate:
         # select crossover point
-        pt = randint(1, len(parent1))
+        pt = randint(1, chromosome_length) * num_bits_per_inst
         # perform crossover
         child1 = parent1[:pt] + parent2[pt:]
         child2 = parent2[:pt] + parent1[pt:]
