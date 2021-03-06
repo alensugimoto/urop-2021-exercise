@@ -1,11 +1,61 @@
-from ga.chromosome_elem import ChromosomeElem
-from track_generator.track_point import TrackPoint
-from track_generator.command import Command
-from track_generator.generator import generate_track
+import math
+from typing import List
+
 from numpy.random import randint
 from numpy.random import rand
 
-import math
+from ga.chromosome_elem import ChromosomeElem
+from track_generator.command import Command
+from track_generator.track_point import TrackPoint
+from track_generator.generator import generate_track
+from config import CHROMOSOME_LENGTH
+
+
+def genetic_algorithm() -> List[ChromosomeElem]:
+    chromosome_elements: List[ChromosomeElem] = []
+
+    num_bits_per_inst = 16
+    chromosome_length = CHROMOSOME_LENGTH
+    population_size = 100
+    num_generations = 100
+
+    penalty_coefs = [50.0, 25.0]
+    value_bounds = [[5.0, 10.0], [5.0, 10.0], [5.0, 10.0], [0.0, 45.0]]
+    crossover_rate = 0.9
+    mutation_rate = 1.0 / float(num_bits_per_inst * chromosome_length)
+
+    # initial population of random bitstrings
+    pop = [randint(0, 2, num_bits_per_inst * chromosome_length).tolist() for _ in range(population_size)]
+    # keep track of best solution
+    best, best_eval = None, None
+    # enumerate generations
+    for gen in range(chromosome_length):
+        # decode population
+        decoded = [decode(value_bounds, chromosome_length, num_bits_per_inst, p) for p in pop]
+        # evaluate all chromosomes in the population
+        scores = [fitness(d, penalty_coefs) for d in decoded]
+        # check for new best solution
+        for i in range(population_size):
+            if best_eval is None or scores[i] < best_eval:
+                best, best_eval = pop[i], scores[i]
+                print(">%d, new best f(%s) = %f" %
+                      (gen, [str(d) for d in decoded[i]], scores[i]))
+        # select parents
+        selected = [selection(pop, scores) for _ in range(population_size)]
+        # create the next generation
+        children = list()
+        for i in range(0, population_size, 2):
+            # get selected parents in pairs
+            p1, p2 = selected[i], selected[i + 1]
+            # crossover and mutation
+            for c in crossover(p1, p2, crossover_rate):
+                # mutation
+                mutation(c, mutation_rate)
+                # store for next generation
+                children.append(c)
+        # replace population
+        pop = children
+    return [best, best_eval]
 
 # decode a bitstring to a chromosome
 def decode(bounds, n_inst, n_bits, bitstring):
@@ -60,7 +110,10 @@ def fitness(chromosome, c_penalty):
     # generate track points
     track_points = generate_track(chromosome_elements=chromosome)
     # calculate distance between start and end points
-    track_points = [TrackPoint(track_points[0].x, track_points[0].y - 2)] + track_points
+    track_points = [TrackPoint(
+        track_points[0].x,
+        track_points[0].y - 2
+    )] + track_points
     start_point = track_points[0]
     end_point = track_points[len(track_points) - 1]
     distance = math.sqrt((start_point.x - end_point.x)
@@ -97,8 +150,10 @@ def fitness(chromosome, c_penalty):
         track_points[1].x - track_points[0].x
     )
     angle2 = math.atan2(
-        track_points[len(track_points) - 1].y - track_points[len(track_points) - 2].y,
-        track_points[len(track_points) - 1].x - track_points[len(track_points) - 2].x
+        track_points[len(track_points) - 1].y -
+        track_points[len(track_points) - 2].y,
+        track_points[len(track_points) - 1].x -
+        track_points[len(track_points) - 2].x
     )
     diff = abs(angle1 - angle2)
 
@@ -135,38 +190,3 @@ def mutation(bitstring, r_mut):
         if rand() < r_mut:
             # flip bit
             bitstring[i] = 1 - bitstring[i]
-
-# genetic algorithm
-def genetic_algorithm(bounds, n_inst, n_bits, n_iter, n_pop, c_penalty, r_cross, r_mut):
-    # initial population of random bitstrings
-    pop = [randint(0, 2, n_bits * n_inst).tolist() for _ in range(n_pop)]
-    # keep track of best solution
-    best, best_eval = None, None
-    # enumerate generations
-    for gen in range(n_iter):
-        # decode population
-        decoded = [decode(bounds, n_inst, n_bits, p) for p in pop]
-        # evaluate all chromosomes in the population
-        scores = [fitness(d, c_penalty) for d in decoded]
-        # check for new best solution
-        for i in range(n_pop):
-            if best_eval is None or scores[i] < best_eval:
-                best, best_eval = pop[i], scores[i]
-                print(">%d, new best f(%s) = %f" %
-                      (gen, [str(d) for d in decoded[i]], scores[i]))
-        # select parents
-        selected = [selection(pop, scores) for _ in range(n_pop)]
-        # create the next generation
-        children = list()
-        for i in range(0, n_pop, 2):
-            # get selected parents in pairs
-            p1, p2 = selected[i], selected[i + 1]
-            # crossover and mutation
-            for c in crossover(p1, p2, r_cross):
-                # mutation
-                mutation(c, r_mut)
-                # store for next generation
-                children.append(c)
-        # replace population
-        pop = children
-    return [best, best_eval]
