@@ -1,5 +1,5 @@
 import math
-from typing import List
+from typing import List, Tuple
 
 from numpy.random import randint
 from numpy.random import rand
@@ -8,79 +8,106 @@ from ga.chromosome_elem import ChromosomeElem
 from track_generator.command import Command
 from track_generator.track_point import TrackPoint
 from track_generator.generator import generate_track
-from config import CHROMOSOME_LENGTH
+
+Pair = Tuple[float, float]
+Bitstring = List[int]
 
 
-def genetic_algorithm() -> List[ChromosomeElem]:
-    chromosome_elements: List[ChromosomeElem] = []
-
-    num_bits_per_inst = 16
-    chromosome_length = CHROMOSOME_LENGTH
-    population_size = 100
-    num_generations = 100
-
-    penalty_coefs = [50.0, 25.0]
-    value_bounds = [[5.0, 10.0], [5.0, 10.0], [5.0, 10.0], [0.0, 45.0]]
-    crossover_rate = 0.9
-    mutation_rate = 1.0 / float(num_bits_per_inst * chromosome_length)
-
-    # initial population of random bitstrings
-    pop = [randint(0, 2, num_bits_per_inst * chromosome_length).tolist() for _ in range(population_size)]
+def genetic_algorithm(
+    num_bits_per_inst: int,
+    chromosome_length: int,
+    population_size: int,
+    num_generations: int,
+    penalty_coefs: Pair,
+    value_bounds: Tuple[Pair, Pair, Pair, Pair],
+    crossover_rate: float,
+    mutation_rate: float,
+) -> List[ChromosomeElem]:
     # keep track of best solution
-    best, best_eval = None, None
+    best_chromosome: List[ChromosomeElem]
+    best_score: float
+    # initial population of random bitstrings
+    pop: List[Bitstring] = [randint(0, 2, num_bits_per_inst * chromosome_length).tolist()
+                            for _ in range(population_size)]
     # enumerate generations
-    for gen in range(chromosome_length):
+    for gen in range(num_generations):
         # decode population
-        decoded = [decode(value_bounds, chromosome_length, num_bits_per_inst, p) for p in pop]
+        decoded_pop: List[List[ChromosomeElem]] = [decode(
+            bitstring=bitstring,
+            num_bits_per_inst=num_bits_per_inst,
+            chromosome_length=chromosome_length,
+            value_bounds=value_bounds,
+        ) for bitstring in pop]
         # evaluate all chromosomes in the population
-        scores = [fitness(d, penalty_coefs) for d in decoded]
+        scores: float = [fitness(
+            chromosome=chromosome,
+            penalty_coefs=penalty_coefs,
+        ) for chromosome in decoded_pop]
         # check for new best solution
         for i in range(population_size):
-            if best_eval is None or scores[i] < best_eval:
-                best, best_eval = pop[i], scores[i]
-                print(">%d, new best f(%s) = %f" %
-                      (gen, [str(d) for d in decoded[i]], scores[i]))
+            if gen == i == 0 or scores[i] < best_score:
+                best_chromosome, best_score = decoded_pop[i], scores[i]
+                print(">%(gen)d, new best f([%(chromosome)s]) = %(score)f" % {
+                    "gen": gen,
+                    "chromosome": ', '.join([str(elem) for elem in best_chromosome]),
+                    "score": scores[i]
+                })
         # select parents
-        selected = [selection(pop, scores) for _ in range(population_size)]
+        selected: List[Bitstring] = [selection(
+            population=pop,
+            scores=scores,
+        ) for _ in range(population_size)]
         # create the next generation
-        children = list()
+        children: List[Bitstring] = []
+        # TODO: check odd population_size
         for i in range(0, population_size, 2):
             # get selected parents in pairs
-            p1, p2 = selected[i], selected[i + 1]
+            parent1, parent2 = selected[i], selected[i + 1]
             # crossover and mutation
-            for c in crossover(p1, p2, crossover_rate):
+            for child in crossover(parent1=parent1, parent2=parent2, crossover_rate=crossover_rate):
                 # mutation
-                mutation(c, mutation_rate)
+                child = mutation(bitstring=child, mutation_rate=mutation_rate)
                 # store for next generation
-                children.append(c)
+                children.append(child)
         # replace population
         pop = children
-    return [best, best_eval]
+    return best_chromosome
 
-# decode a bitstring to a chromosome
-def decode(bounds, n_inst, n_bits, bitstring):
+
+def decode(
+    bitstring: Bitstring,
+    num_bits_per_inst: int,
+    chromosome_length: int,
+    value_bounds: Tuple[Pair, Pair, Pair, Pair],
+) -> List[ChromosomeElem]:
+    prev_command: Command
+
     decoded = list()
-    prev_command = None
-    largest_value = 2**(n_bits - 2)
+    num_command_bits = 2
+    num_value_bits = num_bits_per_inst - num_command_bits
+    largest_value = 2**num_value_bits
     # decode each instruction
-    for i in range(n_inst):
-        command = None
-        start = i * n_bits
-        end = start + n_bits
+    for i in range(chromosome_length):
+        command: Command
+
+        start_inst = i * num_bits_per_inst
+        end_inst = start_inst + num_bits_per_inst
 
         # decode command of instruction
-        if i == 0 or i == n_inst - 1:
+        if i == 0 or i == chromosome_length - 1:
             command = Command.S
         elif prev_command == Command.S:
             # extract the substring
-            command_substring = bitstring[start:start + 2]
+            command_substring = bitstring[start_inst:start_inst +
+                                          num_command_bits]
             # convert bitstring to a string of chars
             command_chars = ''.join([str(s) for s in command_substring])
             # convert string to integer
             command = Command(int(command_chars, 2))
         else:
             # extract the substring
-            command_substring = bitstring[start + 1:start + 2]
+            command_substring = bitstring[start_inst +
+                                          1:start_inst + num_command_bits]
             # convert bitstring to a string of chars
             command_chars = ''.join([str(s) for s in command_substring])
             # convert string to a command
@@ -91,7 +118,8 @@ def decode(bounds, n_inst, n_bits, bitstring):
 
         # decode value of instruction
         # extract the substring
-        value_substring = bitstring[start + 3:end]
+        value_substring = bitstring[start_inst +
+                                    num_command_bits + 1:start_inst]
         # convert bitstring to a string of chars
         value_chars = ''.join([str(s) for s in value_substring])
         # convert string to integer
@@ -105,21 +133,21 @@ def decode(bounds, n_inst, n_bits, bitstring):
         decoded.append(ChromosomeElem(command=command, value=value))
     return decoded
 
-# evaluate the fitness of 'chromosome'
-def fitness(chromosome, c_penalty):
+
+def fitness(
+    chromosome_elements: List[ChromosomeElem],
+    penalty_coefs: Tuple[float, float],
+) -> float:
     # generate track points
-    track_points = generate_track(chromosome_elements=chromosome)
+    track_points = generate_track(chromosome_elements=chromosome_elements)
     # calculate distance between start and end points
-    track_points = [TrackPoint(
-        track_points[0].x,
-        track_points[0].y - 2
-    )] + track_points
-    start_point = track_points[0]
+    start_point = TrackPoint(track_points[0].x, track_points[0].y - 2)
+    track_points = [start_point] + track_points
     end_point = track_points[len(track_points) - 1]
-    distance = math.sqrt((start_point.x - end_point.x)
-                         ** 2 + (start_point.y - end_point.y)**2)
+    disp = math.sqrt((start_point.x - end_point.x)**2
+                     + (start_point.y - end_point.y)**2)
     # calculate number of segment intersections
-    n_int = 0
+    num_intersects = 0
     for i in range(len(track_points) - 3):
         for j in range(i + 2, len(track_points) - 1):
             # set up points
@@ -128,65 +156,60 @@ def fitness(chromosome, c_penalty):
             x1, x2, x3, x4 = p1.x, p2.x, p3.x, p4.x
             y1, y2, y3, y4 = p1.y, p2.y, p3.y, p4.y
             # check if segments intersect
-            '''
-            left1, right1 = min(x1, x2), max(x1, x2)
-            left2, right2 = min(x3, x4), max(x3, x4)
-            bottom1, top1 = min(y1, y2), max(y1, y2)
-            bottom2, top2 = min(y3, y4), max(y3, y4)
-            if left1 <= right2 and right1 >= left2 and top1 >= bottom2 and bottom1 <= top2:
-            '''
             denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4)
             if denom != 0:
                 t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom
                 if 0 < t <= 1:
-                    u = (((x2 - x1) * (y1 - y3)) -
-                         ((y2 - y1) * (x1 - x3))) / denom
+                    u = ((x2 - x1) * (y1 - y3) - (y2 - y1) * (x1 - x3)) / denom
                     if 0 < u <= 1:
                         # increment 'n_int'
-                        n_int += 1
+                        num_intersects += 1
     # calculate degree of kink at start and end points
-    angle1 = math.atan2(
-        track_points[1].y - track_points[0].y,
-        track_points[1].x - track_points[0].x
-    )
-    angle2 = math.atan2(
-        track_points[len(track_points) - 1].y -
-        track_points[len(track_points) - 2].y,
-        track_points[len(track_points) - 1].x -
-        track_points[len(track_points) - 2].x
-    )
-    diff = abs(angle1 - angle2)
+    pt_before_end = track_points[len(track_points) - 2]
+    penalty2 = abs(pt_before_end.x - end_point)
+    # return fitness
+    return disp + penalty_coefs[0] * num_intersects + penalty_coefs[1] * penalty2
 
-    return distance + c_penalty * (n_int + 0.2 * diff)
 
-# select a parent with tournament selection
-def selection(pop, scores, k=3):
+def selection(
+    population: List[Bitstring]
+    scores: List[float]
+    k: int = 3
+) -> Bitstring:
     # select a random index
-    selection_i = randint(len(pop))
-    for i in randint(0, len(pop), k - 1):
+    selection_i = randint(len(population))
+    for i in randint(0, len(population), k - 1):
         # check if this index is better than 'selection_i'
         if scores[i] < scores[selection_i]:
             # update best index
             selection_i = i
-    return pop[selection_i]
+    return population[selection_i]
 
-# perform a singe-point crossover
-def crossover(p1, p2, r_cross):
+
+def crossover(
+    parent1: Bitstring,
+    parent2: Bitstring,
+    crossover_rate: float,
+) -> Tuple[Bitstring, Bitstring]:
     # copy parents into children
-    c1, c2 = p1.copy(), p2.copy()
+    child1, child2 = parent1.copy(), parent2.copy()
     # try to perform a crossover
-    if rand() < r_cross:
+    if rand() < crossover_rate:
         # select crossover point
-        pt = randint(1, len(p1))
+        pt = randint(1, len(parent1))
         # perform crossover
-        c1 = p1[:pt] + p2[pt:]
-        c2 = p2[:pt] + p1[pt:]
-    return [c1, c2]
+        child1 = parent1[:pt] + parent2[pt:]
+        child2 = parent2[:pt] + parent1[pt:]
+    return (child1, child2)
 
-# mutate 'bitstring' at a rate 'r_mut'
-def mutation(bitstring, r_mut):
+
+def mutation(
+    bitstring: Bitstring,
+    mutation_rate: float,
+) -> Bitstring:
     for i in range(len(bitstring)):
         # try to mutate bit
-        if rand() < r_mut:
+        if rand() < mutation_rate:
             # flip bit
             bitstring[i] = 1 - bitstring[i]
+    return bitstring
