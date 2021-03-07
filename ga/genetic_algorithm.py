@@ -39,10 +39,10 @@ def genetic_algorithm(
             value_bounds=value_bounds,
         ) for bitstring in pop]
         # evaluate all chromosomes in the population
-        scores: float = [fitness(
-            chromosome_elements=chromosome,
+        scores: List[float] = [fitness(
+            chromosome_elements=chromosome_elements,
             penalty_coefs=penalty_coefs,
-        ) for chromosome in decoded_pop]
+        ) for chromosome_elements in decoded_pop]
         # check for new best solution
         for i in range(population_size):
             if gen == i == 0 or scores[i] < best_score:
@@ -50,8 +50,7 @@ def genetic_algorithm(
                 print(">%(gen)d, new best f([%(chromosome)s]) = %(score)f" % {
                     "gen": gen,
                     "chromosome": ', '.join([str(elem) for elem in best_chromosome]),
-                    "score": best_score,
-                })
+                    "score": best_score})
         # select parents
         selected: List[Bitstring] = [selection(
             population=pop,
@@ -59,7 +58,6 @@ def genetic_algorithm(
         ) for _ in range(population_size)]
         # create the next generation
         children: List[Bitstring] = []
-        # TODO: check odd population_size
         for i in range(0, population_size, 2):
             # get selected parents in pairs
             parent1, parent2 = selected[i], selected[i + 1]
@@ -80,8 +78,7 @@ def genetic_algorithm(
     print('Done!')
     print("f([%(chromosome)s]) = %(score)f" % {
         "chromosome": ', '.join([str(elem) for elem in best_chromosome]),
-        "score": best_score,
-    })
+        "score": best_score})
     return best_chromosome
 
 
@@ -93,54 +90,41 @@ def decode(
 ) -> List[ChromosomeElem]:
     decoded: List[ChromosomeElem] = []
     prev_command: Command
-
-    num_command_bits = 2
-    num_value_bits = num_bits_per_inst - num_command_bits
-    largest_value = 2**num_value_bits
     # decode each instruction
     for i in range(chromosome_length):
         start = i * num_bits_per_inst
         end = start + num_bits_per_inst
         # decode command of instruction
         command: Command
+        num_command_bits = 2
         if i == 0 or i == chromosome_length - 1:
             command = Command.S
-        elif i == chromosome_length - 2:
-            # extract the substring
-            command_substring = bitstring[start:start + num_command_bits]
-            # convert bitstring to a string of chars
-            command_chars = ''.join([str(s) for s in command_substring])
-            # convert string to integer
-            command = Command(int(command_chars, 2) % 3)
-        elif prev_command == Command.S:
-            # extract the substring
-            command_substring = bitstring[start:start + num_command_bits]
-            # convert bitstring to a string of chars
-            command_chars = ''.join([str(s) for s in command_substring])
-            # convert string to integer
-            command = Command(int(command_chars, 2))
         else:
-            # extract the substring
-            command_substring = bitstring[start + 1:start + num_command_bits]
-            # convert bitstring to a string of chars
+            command_substring = bitstring[start:start + num_command_bits]
             command_chars = ''.join([str(s) for s in command_substring])
-            # convert string to a command
-            if prev_command == Command.DY:
-                command = Command(int(command_chars, 2) + 1)
+            if i == chromosome_length - 2:
+                # possible commands: S, R, L
+                command = Command(int(command_chars, 2) % 3)
+            elif prev_command == Command.S:
+                # possible commands: S, R, L, DY
+                command = Command(int(command_chars, 2))
+            elif prev_command == Command.DY:
+                # possible commands: R, L
+                command = Command(int(command_chars, 2) % 2 + 1)
             else:
-                command = Command(int(command_chars, 2) * 3)
+                # possible commands: S, DY
+                command = Command(int(command_chars, 2) % 2 * 3)
         # decode value of instruction
         value: float
-        # extract the substring
-        value_substring = bitstring[start + num_command_bits + 1:end]
-        # convert bitstring to a string of chars
+        num_value_bits = num_bits_per_inst - num_command_bits
+        value_substring = bitstring[start + num_command_bits:end]
         value_chars = ''.join([str(s) for s in value_substring])
-        # convert string to integer
         integer = int(value_chars, 2)
         # scale integer to desired range
-        value = value_bounds[command.value][0] + (integer / largest_value) * \
-            (value_bounds[command.value][1] - value_bounds[command.value][0])
-        # store
+        largest_value = 2**num_value_bits - 1
+        value = value_bounds[command.value][0] + (integer / largest_value) * (
+            value_bounds[command.value][1] - value_bounds[command.value][0])
+        # prepare for next iteration
         prev_command = command
         decoded.append(ChromosomeElem(command=command, value=value))
     return decoded
@@ -157,17 +141,16 @@ def fitness(
     end_point = track_points[-1]
     disp = math.sqrt((start_point.x - end_point.x)**2
                      + (start_point.y - end_point.y)**2)
-    # calculate number of segment intersections
-    filtered_points = filter(
+    # find all vertices of the track
+    vertices = track_vertices(
         track_points=[end_point] + track_points,
-        chromosome_elements=chromosome_elements,
-    )
+        chromosome_elements=chromosome_elements)
+    # calculate number of line-segment intersections
     num_intersects = 0
-    for i in range(len(filtered_points) - 2):
-        for j in range(i + 1, len(filtered_points) - 1):
-            # set up points
-            p1, p2 = filtered_points[i], filtered_points[i + 1]
-            p3, p4 = filtered_points[j], filtered_points[j + 1]
+    for i in range(len(vertices) - 2):
+        for j in range(i + 1, len(vertices) - 1):
+            p1, p2 = vertices[i], vertices[i + 1]
+            p3, p4 = vertices[j], vertices[j + 1]
             x1, x2, x3, x4 = p1.x, p2.x, p3.x, p4.x
             y1, y2, y3, y4 = p1.y, p2.y, p3.y, p4.y
             # check if segments intersect
@@ -178,11 +161,10 @@ def fitness(
                     u = ((x2 - x1) * (y1 - y3) - (y2 - y1) * (x1 - x3)) / denom
                     if 0 < u <= 1:
                         num_intersects += 1
-    # calculate difference between a vehicle's direction on start and end points
+    # calculate difference in vehicle direction at start and end points
     angle = math.atan2(
         end_point.y - track_points[-2].y,
-        end_point.x - track_points[-2].x
-    )
+        end_point.x - track_points[-2].x)
     if angle <= -math.pi / 2:
         angle += 2 * math.pi
     diff_direction = abs(math.pi / 2 - angle)
@@ -190,28 +172,29 @@ def fitness(
     return disp + penalty_coefs[0] * num_intersects + penalty_coefs[1] * diff_direction
 
 
-def filter(
+def track_vertices(
     track_points: List[TrackPoint],
     chromosome_elements: List[ChromosomeElem],
 ) -> List[TrackPoint]:
-    filtered_points: List[TrackPoint] = track_points[0:2]
+    vertices: List[TrackPoint] = track_points[0:2]
     steps: int = 0
     prev_command: Command = Command.R
+    # find vertices for each intruction
     for ce in chromosome_elements:
         command = ce.command
         args = ce.value
         if command == Command.S:
             steps += int(args)
-            if steps != 1:
+            if steps > 1:
                 if prev_command == Command.S:
-                    filtered_points[-1] = track_points[steps]
+                    vertices[-1] = track_points[steps]
                 else:
-                    filtered_points.append(track_points[steps])
+                    vertices.append(track_points[steps])
         elif command != Command.DY:
-            filtered_points += track_points[steps + 1:steps + int(args) + 1]
+            vertices += track_points[steps + 1:steps + int(args) + 1]
             steps += int(args)
         prev_command = command
-    return filtered_points
+    return vertices
 
 
 def selection(
