@@ -174,6 +174,8 @@ def fitness(
         end_point.y - track_points[len(track_points) - 2].y,
         end_point.x - track_points[len(track_points) - 2].x
     )
+    if angle <= -math.pi / 2:
+        angle += 2 * math.pi
     diff_direction = abs(math.pi / 2 - angle)
     # combine results
     return disp + penalty_coefs[0] * num_intersects + penalty_coefs[1] * diff_direction
