@@ -184,6 +184,7 @@ def track_vertices(
         command = ce.command
         args = ce.value
         if command == Command.S:
+            # the end point of a line segment may be vertex
             steps += int(args)
             if steps > 1:
                 if prev_command == Command.S:
@@ -191,6 +192,7 @@ def track_vertices(
                 else:
                     vertices.append(track_points[steps])
         elif command != Command.DY:
+            # points on a curve are all vertices
             vertices += track_points[steps + 1:steps + int(args) + 1]
             steps += int(args)
         prev_command = command

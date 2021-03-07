@@ -8,13 +8,21 @@ import matplotlib.pyplot as plt
 
 if __name__ == '__main__':
 
-    num_bits_per_inst = 18 # > 2
+    # number of bits representing one instruction
+    num_bits_per_inst = 34  # > 2
+    # number of instructions per track
     chromosome_length = CHROMOSOME_LENGTH
-    population_size = 100 # even
-    num_generations = 100 # > 0
+    # population of every generation
+    population_size = 100  # even
+    # number of new generations to be generated
+    num_generations = 100  # > 0
+    # penalty coefficients for fitness function
     penalty_coefs = (50.0, 0.0)
-    value_bounds = ((5.0, 10.0), (5.0, 10.0), (5.0, 10.0), (10.0, 45.0))
+    # lower and uppers bounds of instruction values
+    value_bounds = ((5.0, 10.0), (5.0, 10.0), (5.0, 10.0), (5.0, 45.0))
+    # probability of crossover between two parents
     crossover_rate = 0.9
+    # probability of mutaton (bit flip) per every bit
     mutation_rate = 1.0 / float(num_bits_per_inst * chromosome_length)
 
     chromosome_elements = genetic_algorithm(
