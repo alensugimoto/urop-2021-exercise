@@ -105,6 +105,13 @@ def decode(
         command: Command
         if i == 0 or i == chromosome_length - 1:
             command = Command.S
+        elif i == chromosome_length - 2:
+            # extract the substring
+            command_substring = bitstring[start:start + num_command_bits]
+            # convert bitstring to a string of chars
+            command_chars = ''.join([str(s) for s in command_substring])
+            # convert string to integer
+            command = Command(int(command_chars, 2) % 3)
         elif prev_command == Command.S:
             # extract the substring
             command_substring = bitstring[start:start + num_command_bits]
