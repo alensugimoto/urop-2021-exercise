@@ -50,7 +50,7 @@ def genetic_algorithm(
                 print(">%(gen)d, new best f([%(chromosome)s]) = %(score)f" % {
                     "gen": gen,
                     "chromosome": ', '.join([str(elem) for elem in best_chromosome]),
-                    "score": scores[i],
+                    "score": best_score,
                 })
         # select parents
         selected: List[Bitstring] = [selection(
@@ -64,7 +64,13 @@ def genetic_algorithm(
             # get selected parents in pairs
             parent1, parent2 = selected[i], selected[i + 1]
             # crossover and mutation
-            for child in crossover(parent1=parent1, parent2=parent2, crossover_rate=crossover_rate):
+            for child in crossover(
+                parent1=parent1,
+                parent2=parent2,
+                num_bits_per_inst=num_bits_per_inst,
+                chromosome_length=chromosome_length,
+                crossover_rate=crossover_rate,
+            ):
                 # mutation
                 child = mutation(bitstring=child, mutation_rate=mutation_rate)
                 # store for next generation
@@ -141,12 +147,11 @@ def fitness(
     track_points = generate_track(chromosome_elements=chromosome_elements)
     # calculate distance between start and end points
     start_point = TrackPoint(track_points[0].x, track_points[0].y - 2)
-    track_points = [start_point] + track_points
     end_point = track_points[len(track_points) - 1]
     disp = math.sqrt((start_point.x - end_point.x)**2
                      + (start_point.y - end_point.y)**2)
-
     # calculate number of segment intersections
+    track_points = [end_point] + track_points
     num_intersects = 0
     for i in range(len(track_points) - 3):
         for j in range(i + 2, len(track_points) - 1):
@@ -164,15 +169,14 @@ def fitness(
                     if 0 < u <= 1:
                         # increment 'n_int'
                         num_intersects += 1
-
-    # direction of a car at the end point against the horizontal
+    # calculate difference between a vehicle's direction on start and end points
     angle = math.atan2(
         end_point.y - track_points[len(track_points) - 2].y,
         end_point.x - track_points[len(track_points) - 2].x
     )
-    diff = abs(math.pi / 2 - angle)
-
-    return disp + penalty_coefs[0] * num_intersects + penalty_coefs[1] * diff
+    diff_direction = abs(math.pi / 2 - angle)
+    # combine results
+    return disp + penalty_coefs[0] * num_intersects + penalty_coefs[1] * diff_direction
 
 
 def selection(
