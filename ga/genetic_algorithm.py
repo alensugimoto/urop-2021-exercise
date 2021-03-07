@@ -154,17 +154,20 @@ def fitness(
     track_points = generate_track(chromosome_elements=chromosome_elements)
     # calculate distance between start and end points
     start_point = TrackPoint(track_points[0].x, track_points[0].y - 2)
-    end_point = track_points[len(track_points) - 1]
+    end_point = track_points[-1]
     disp = math.sqrt((start_point.x - end_point.x)**2
                      + (start_point.y - end_point.y)**2)
     # calculate number of segment intersections
-    track_points = [end_point] + track_points
+    filtered_points = filter(
+        track_points=[end_point] + track_points,
+        chromosome_elements=chromosome_elements,
+    )
     num_intersects = 0
-    for i in range(len(track_points) - 2):
-        for j in range(i + 1, len(track_points) - 1):
+    for i in range(len(filtered_points) - 2):
+        for j in range(i + 1, len(filtered_points) - 1):
             # set up points
-            p1, p2 = track_points[i], track_points[i + 1]
-            p3, p4 = track_points[j], track_points[j + 1]
+            p1, p2 = filtered_points[i], filtered_points[i + 1]
+            p3, p4 = filtered_points[j], filtered_points[j + 1]
             x1, x2, x3, x4 = p1.x, p2.x, p3.x, p4.x
             y1, y2, y3, y4 = p1.y, p2.y, p3.y, p4.y
             # check if segments intersect
@@ -177,14 +180,38 @@ def fitness(
                         num_intersects += 1
     # calculate difference between a vehicle's direction on start and end points
     angle = math.atan2(
-        end_point.y - track_points[len(track_points) - 2].y,
-        end_point.x - track_points[len(track_points) - 2].x
+        end_point.y - track_points[-2].y,
+        end_point.x - track_points[-2].x
     )
     if angle <= -math.pi / 2:
         angle += 2 * math.pi
     diff_direction = abs(math.pi / 2 - angle)
     # combine results
     return disp + penalty_coefs[0] * num_intersects + penalty_coefs[1] * diff_direction
+
+
+def filter(
+    track_points: List[TrackPoint],
+    chromosome_elements: List[ChromosomeElem],
+) -> List[TrackPoint]:
+    filtered_points: List[TrackPoint] = track_points[0:2]
+    steps: int = 0
+    prev_command: Command = Command.R
+    for ce in chromosome_elements:
+        command = ce.command
+        args = ce.value
+        if command == Command.S:
+            steps += int(args)
+            if steps != 1:
+                if prev_command == Command.S:
+                    filtered_points[-1] = track_points[steps]
+                else:
+                    filtered_points.append(track_points[steps])
+        elif command != Command.DY:
+            filtered_points += track_points[steps + 1:steps + int(args) + 1]
+            steps += int(args)
+        prev_command = command
+    return filtered_points
 
 
 def selection(
