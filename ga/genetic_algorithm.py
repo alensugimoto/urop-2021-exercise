@@ -153,8 +153,8 @@ def fitness(
     # calculate number of segment intersections
     track_points = [end_point] + track_points
     num_intersects = 0
-    for i in range(len(track_points) - 3):
-        for j in range(i + 2, len(track_points) - 1):
+    for i in range(len(track_points) - 2):
+        for j in range(i + 1, len(track_points) - 1):
             # set up points
             p1, p2 = track_points[i], track_points[i + 1]
             p3, p4 = track_points[j], track_points[j + 1]
@@ -167,7 +167,6 @@ def fitness(
                 if 0 < t <= 1:
                     u = ((x2 - x1) * (y1 - y3) - (y2 - y1) * (x1 - x3)) / denom
                     if 0 < u <= 1:
-                        # increment 'n_int'
                         num_intersects += 1
     # calculate difference between a vehicle's direction on start and end points
     angle = math.atan2(
