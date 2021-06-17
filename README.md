@@ -46,3 +46,8 @@ The solution to this problem is not unique, i.e. there are several tracks with t
 Install python on your machine (we used version 3.6) and install the requirements with `pip install -r requirements.txt`.
 If you execute [main.py](https://github.com/testingautomated-usi/urop-2021-exercise/blob/master/main.py) 
 you should see the plot above indicating that all the dependencies have been correctly installed.
+
+## Resources
+
+* [Simple Genetic Algorithm From Scratch in Python - Machine Learning Mastery](https://machinelearningmastery.com/simple-genetic-algorithm-from-scratch-in-python/)
+* [Search-based Procedural Content Generation for Race Tracks in Video Games](http://ijeei.org/docs-1545694805886d69b7e8a7.pdf)
